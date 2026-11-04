@@ -20,14 +20,14 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: Setup Latest Gradle Wrapper
+    # CARA RESMI: Menggunakan aksi resmi GitHub untuk memasang Gradle terbaru secara otomatis
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: '8.5'
+
+    - name: Generate Gradle Wrapper
       run: |
-        # Mengunduh dan memasang Gradle versi terbaru (8.5) secara portabel
-        wget https://gradle.org -P /tmp
-        sudo unzip -d /opt/gradle /tmp/gradle-8.5-bin.zip
-        export PATH=$PATH:/opt/gradle/gradle-8.5/bin
-        
-        # Membuat file gradlew baru menggunakan versi gradle terbaru
         gradle wrapper
         chmod +x gradlew
 
