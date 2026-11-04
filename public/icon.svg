@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#171717"/>
+      <stop offset="100%" stop-color="#0a0a0a"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef08a"/>
+      <stop offset="40%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <linearGradient id="neon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="24" y="24" width="464" height="464" rx="96" fill="none" stroke="rgba(245, 158, 11, 0.25)" stroke-width="4"/>
+  <!-- Cinema Aperture & Dynamic Range Sparks -->
+  <g transform="translate(256, 256)">
+    <!-- Outer Glow Ring -->
+    <circle r="140" fill="none" stroke="url(#gold)" stroke-width="12" stroke-linecap="round" stroke-dasharray="32 16"/>
+    <!-- Inner Lens Core -->
+    <circle r="96" fill="#1c1917" stroke="url(#neon)" stroke-width="6"/>
+    <!-- HDR Iris Blades -->
+    <path d="M0 -96 L40 -30 L-20 -30 Z" fill="url(#gold)" opacity="0.9"/>
+    <path d="M0 -96 L40 -30 L-20 -30 Z" transform="rotate(72)" fill="url(#gold)" opacity="0.85"/>
+    <path d="M0 -96 L40 -30 L-20 -30 Z" transform="rotate(144)" fill="url(#gold)" opacity="0.8"/>
+    <path d="M0 -96 L40 -30 L-20 -30 Z" transform="rotate(216)" fill="url(#gold)" opacity="0.85"/>
+    <path d="M0 -96 L40 -30 L-20 -30 Z" transform="rotate(288)" fill="url(#gold)" opacity="0.9"/>
+    <!-- Specular Flare Center -->
+    <circle r="36" fill="#ffffff" filter="drop-shadow(0 0 16px rgba(254, 240, 138, 0.9))"/>
+    <polygon points="0,-48 10,-10 48,0 10,10 0,48 -10,10 -48,0 -10,-10" fill="#fef08a"/>
+  </g>
+</svg>

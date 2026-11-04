@@ -1,0 +1,6 @@
+{
+  "name": "LuminaHDR - Dolby Vision & HDR10 Video Mastering Studio",
+  "description": "Aplikasi mastering dan tone-mapping video HDR10 & Dolby Vision untuk TikTok, Instagram Reels, dan WhatsApp tanpa luntur (anti-washout).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

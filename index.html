@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="id" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    
+    <!-- Device-specific display orientation & PWA full interface meta -->
+    <meta name="screen-orientation" content="portrait" />
+    <meta name="x5-orientation" content="portrait" />
+    <meta name="x5-page-mode" content="app" />
+    <meta name="browsermode" content="application" />
+    <script>
+      (function () {
+        try {
+          var isMobileHandset =
+            /Android|iPhone|iPod/i.test(navigator.userAgent) ||
+            (window.innerWidth <= 768 && window.innerHeight >= window.innerWidth);
+          var orientationTarget = isMobileHandset ? 'portrait' : 'landscape';
+
+          var screenOriMeta = document.querySelector('meta[name="screen-orientation"]');
+          if (screenOriMeta) {
+            screenOriMeta.setAttribute('content', orientationTarget);
+          }
+          var x5OriMeta = document.querySelector('meta[name="x5-orientation"]');
+          if (x5OriMeta) {
+            x5OriMeta.setAttribute('content', orientationTarget);
+          }
+
+          if (
+            window.matchMedia('(display-mode: standalone)').matches &&
+            screen.orientation &&
+            typeof screen.orientation.lock === 'function'
+          ) {
+            screen.orientation.lock(orientationTarget).catch(function () {});
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <title>LuminaHDR - Dolby Vision & HDR10 Video Mastering Studio</title>
+    <meta name="description" content="Aplikasi mastering dan tone-mapping video HDR10 & Dolby Vision untuk TikTok, Instagram Reels, dan WhatsApp tanpa luntur (anti-washout)." />
+    <meta property="og:title" content="LuminaHDR - Dolby Vision & HDR10 Video Mastering Studio" />
+    <meta property="og:description" content="Aplikasi mastering dan tone-mapping video HDR10 & Dolby Vision untuk TikTok, Instagram Reels, dan WhatsApp tanpa luntur (anti-washout)." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    
+    <!-- PWA & Mobile Web App Standalone Meta -->
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="LuminaHDR" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-neutral-950 text-neutral-100 antialiased font-sans selection:bg-amber-500/20 selection:text-amber-200">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
