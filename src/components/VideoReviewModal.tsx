@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { PlatformPresetConfig, ColorGradingSettings } from '../types/video';
 import { ParsedLUT } from '../utils/lutParser';
+import { saveVideoToDevice, shareVideoToApps } from '../utils/fileSaver';
 import {
   Download,
   Share2,
@@ -17,6 +18,7 @@ import {
   Film,
   FileCheck,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
 
 interface VideoReviewModalProps {
@@ -49,6 +51,7 @@ export const VideoReviewModal: React.FC<VideoReviewModalProps> = ({
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [isDownloaded, setIsDownloaded] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
   if (!isOpen || !videoUrl) return null;
@@ -66,49 +69,37 @@ export const VideoReviewModal: React.FC<VideoReviewModalProps> = ({
     }
   };
 
-  const handleDownload = () => {
-    const a = document.createElement('a');
-    a.href = videoUrl;
-    a.download = fileName;
-    a.click();
-    setIsDownloaded(true);
-    setTimeout(() => setIsDownloaded(false), 3000);
+  const handleDownload = async () => {
+    setIsSaving(true);
+    setShareFeedback('Menyimpan ke perangkat...');
+    try {
+      const res = await saveVideoToDevice(videoUrl, fileName, {
+        onProgressText: (t) => setShareFeedback(t),
+      });
+      setIsSaving(false);
+      if (res.success) {
+        setIsDownloaded(true);
+        setShareFeedback(res.message);
+        setTimeout(() => setIsDownloaded(false), 5000);
+      } else {
+        setShareFeedback(res.message);
+      }
+    } catch (err: any) {
+      setIsSaving(false);
+      setShareFeedback(`Gagal menyimpan: ${err?.message || 'Kesalahan sistem'}`);
+    }
   };
 
   // Native Web Share API (Direct share to WhatsApp, Instagram, TikTok on Android/iOS)
   const handleShare = async () => {
+    setShareFeedback('Menyiapkan video untuk dibagikan...');
     try {
-      if (navigator.share) {
-        // Fetch blob from blobUrl to create actual File object for sharing
-        const response = await fetch(videoUrl);
-        const blob = await response.blob();
-        const file = new File([blob], fileName, { type: blob.type || 'video/mp4' });
-
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            title: `LuminaHDR - ${fileName}`,
-            text: `Video HDR yang sudah dimastering untuk ${preset.platform} tanpa luntur!`,
-            files: [file],
-          });
-          setShareFeedback('Berhasil membuka lembar berbagi!');
-        } else {
-          await navigator.share({
-            title: `LuminaHDR - ${fileName}`,
-            text: `Video master HDR siap diposting ke ${preset.platform}`,
-            url: window.location.href,
-          });
-        }
-      } else {
-        // Fallback: trigger download
-        handleDownload();
-        setShareFeedback('File diunduh ke perangkat (bisa langsung dibagikan dari galeri).');
-      }
-    } catch (err: any) {
-      if (err.name !== 'AbortError') {
-        handleDownload();
-      }
+      const res = await shareVideoToApps(videoUrl, fileName, preset.platform);
+      setShareFeedback(res.message);
+    } catch {
+      setShareFeedback('Gagal membagikan video.');
     }
-    setTimeout(() => setShareFeedback(null), 4000);
+    setTimeout(() => setShareFeedback(null), 5000);
   };
 
   const formatTime = (sec: number) => {
@@ -258,12 +249,18 @@ export const VideoReviewModal: React.FC<VideoReviewModalProps> = ({
               {/* Primary: Save to Gallery / Download */}
               <button
                 onClick={handleDownload}
-                className="w-full py-3 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 text-neutral-950 text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-400/10 transition-all cursor-pointer active:scale-98"
+                disabled={isSaving}
+                className="w-full py-3 px-4 rounded-xl bg-amber-400 hover:bg-amber-300 disabled:opacity-75 text-neutral-950 text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-400/10 transition-all cursor-pointer active:scale-98"
               >
-                {isDownloaded ? (
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-neutral-950" />
+                    <span>Menyimpan ke Perangkat...</span>
+                  </>
+                ) : isDownloaded ? (
                   <>
                     <Check className="w-4 h-4 stroke-[3] text-neutral-950" />
-                    <span>Tersimpan di Perangkat!</span>
+                    <span>Tersimpan di Perangkat / Galeri!</span>
                   </>
                 ) : (
                   <>

@@ -15,6 +15,8 @@ import {
   Copy,
   Info,
   RefreshCw,
+  GitBranch,
+  Terminal,
 } from 'lucide-react';
 
 interface APKInstallModalProps {
@@ -24,7 +26,7 @@ interface APKInstallModalProps {
 
 export const APKInstallModal: React.FC<APKInstallModalProps> = ({ isOpen, onClose }) => {
   const { isInstallable, isInstalled, isIOS, isAndroid, install } = usePWAInstall();
-  const [activeTab, setActiveTab] = useState<'direct_apk' | 'webapk' | 'ios'>('direct_apk');
+  const [activeTab, setActiveTab] = useState<'direct_apk' | 'webapk' | 'ios' | 'github'>('direct_apk');
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
   const [downloadStatus, setDownloadStatus] = useState<string>('');
@@ -165,6 +167,17 @@ export const APKInstallModal: React.FC<APKInstallModalProps> = ({ isOpen, onClos
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span>2. Pasang Cepat di Browser (WebAPK)</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('github')}
+            className={`pb-2.5 transition-colors cursor-pointer relative flex items-center gap-2 ${
+              activeTab === 'github'
+                ? 'text-cyan-400 border-b-2 border-cyan-400 font-bold'
+                : 'text-neutral-400 hover:text-neutral-200'
+            }`}
+          >
+            <GitBranch className="w-3.5 h-3.5 text-cyan-400" />
+            <span>3. Integrasi GitHub (Auto-Build APK)</span>
           </button>
           {isIOS && (
             <button
@@ -424,6 +437,36 @@ export const APKInstallModal: React.FC<APKInstallModalProps> = ({ isOpen, onClos
                 <li>Gulir ke bawah dan ketuk <strong>"Tambahkan ke Layar Utama (Add to Home Screen)"</strong>.</li>
                 <li>Ketuk <strong>"Tambah"</strong> di pojok kanan atas. Ikon LuminaHDR akan muncul di home screen iPhone Anda.</li>
               </ol>
+            </div>
+          )}
+
+          {activeTab === 'github' && (
+            <div className="p-4 rounded-xl bg-neutral-950 border border-neutral-800 space-y-4">
+              <div>
+                <div className="text-sm font-bold text-white flex items-center gap-2">
+                  <GitBranch className="w-4 h-4 text-cyan-400" />
+                  <span>Integrasi Otomatis APK di GitHub Actions</span>
+                </div>
+                <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
+                  Repositori ini sudah terkonfigurasi dengan file CI/CD resmi (<code className="text-amber-300 bg-neutral-900 px-1 py-0.5 rounded">.github/workflows/build-apk.yml</code>). Begitu Anda mengunggah kode ke GitHub, GitHub akan otomatis membangun dan menandatangani file APK Android murni.
+                </p>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <span className="font-semibold text-neutral-200">Cara Mengunduh APK dari GitHub:</span>
+                <ol className="list-decimal list-inside space-y-2 text-neutral-300 text-[11px] bg-neutral-900 p-3.5 rounded-lg border border-neutral-800">
+                  <li>Push repositori ke akun GitHub Anda.</li>
+                  <li>Buka repositori di GitHub dan klik tab <strong>Actions</strong> di menu atas.</li>
+                  <li>GitHub Actions akan otomatis menjalankan alur <strong>"Build Android APK"</strong> (atau klik manual <strong>Run workflow</strong>).</li>
+                  <li>Setelah selesai (centang hijau), klik workflow tersebut dan unduh file di bagian <strong>Artifacts: LuminaHDR-v1.0-release-apk</strong>.</li>
+                  <li>Kirim file APK ke HP Anda dan langsung instal tanpa butuh Android Studio!</li>
+                </ol>
+              </div>
+
+              <div className="p-3 rounded-lg bg-cyan-950/40 border border-cyan-500/30 text-[11px] text-cyan-200 flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-cyan-400 shrink-0" />
+                <span>Dokumentasi lengkap langkah demi langkah tersedia di file <strong>GITHUB_APK_GUIDE.md</strong> di root repositori.</span>
+              </div>
             </div>
           )}
         </div>

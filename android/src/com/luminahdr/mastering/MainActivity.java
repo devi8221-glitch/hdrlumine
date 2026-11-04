@@ -28,7 +28,11 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Toast;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
+import android.media.MediaScannerConnection;
+import android.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -185,8 +189,147 @@ public class MainActivity extends Activity {
             }
         });
 
+        // 7. Native Android Bridge for saving videos directly to Gallery & Movies storage
+        webView.addJavascriptInterface(new AndroidBridge(), "AndroidBridge");
+
         // Load offline local app directly from embedded APK assets
         webView.loadUrl(LOCAL_ORIGIN + "/index.html");
+    }
+
+    public class AndroidBridge {
+        @android.webkit.JavascriptInterface
+        public boolean isAndroidApp() {
+            return true;
+        }
+
+        @android.webkit.JavascriptInterface
+        public void saveVideoBase64(final String base64Data, final String fileName, final String mimeType) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    saveFileToStorage(base64Data, fileName, mimeType);
+                }
+            }).start();
+        }
+
+        @android.webkit.JavascriptInterface
+        public void shareVideoBase64(final String base64Data, final String fileName, final String mimeType) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    shareVideoFile(base64Data, fileName, mimeType);
+                }
+            }).start();
+        }
+    }
+
+    private void saveFileToStorage(String base64Data, String fileName, String mimeType) {
+        try {
+            String cleanData = base64Data;
+            int commaIdx = cleanData.indexOf(",");
+            if (commaIdx != -1) {
+                cleanData = cleanData.substring(commaIdx + 1);
+            }
+
+            byte[] videoBytes = Base64.decode(cleanData, Base64.DEFAULT);
+
+            // Prefer Movies/LuminaHDR folder so it appears in video players and galleries
+            File targetDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES);
+            if (targetDir == null) {
+                targetDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
+            }
+            File luminaFolder = new File(targetDir, "LuminaHDR");
+            if (!luminaFolder.exists()) {
+                luminaFolder.mkdirs();
+            }
+
+            final File outputFile = new File(luminaFolder, fileName);
+            FileOutputStream fos = new FileOutputStream(outputFile);
+            fos.write(videoBytes);
+            fos.flush();
+            fos.close();
+
+            // Scan file to trigger Android MediaStore / Gallery refresh
+            MediaScannerConnection.scanFile(
+                MainActivity.this,
+                new String[]{outputFile.getAbsolutePath()},
+                new String[]{mimeType != null && !mimeType.isEmpty() ? mimeType : "video/mp4"},
+                new MediaScannerConnection.OnScanCompletedListener() {
+                    @Override
+                    public void onScanCompleted(String path, Uri uri) {
+                        // Scan complete
+                    }
+                }
+            );
+
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(
+                        MainActivity.this,
+                        "✓ Berhasil disimpan di Galeri:\n" + outputFile.getName(),
+                        Toast.LENGTH_LONG
+                    ).show();
+
+                    if (webView != null) {
+                        webView.evaluateJavascript(
+                            "window.onAndroidSaveResult && window.onAndroidSaveResult(true, '" + outputFile.getAbsolutePath().replace("'", "\\'") + "');",
+                            null
+                        );
+                    }
+                }
+            });
+        } catch (final Exception e) {
+            e.printStackTrace();
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(
+                        MainActivity.this,
+                        "Gagal menyimpan video: " + e.getMessage(),
+                        Toast.LENGTH_LONG
+                    ).show();
+
+                    if (webView != null) {
+                        webView.evaluateJavascript(
+                            "window.onAndroidSaveResult && window.onAndroidSaveResult(false, '" + e.getMessage().replace("'", "\\'") + "');",
+                            null
+                        );
+                    }
+                }
+            });
+        }
+    }
+
+    private void shareVideoFile(String base64Data, String fileName, String mimeType) {
+        try {
+            String cleanData = base64Data;
+            int commaIdx = cleanData.indexOf(",");
+            if (commaIdx != -1) {
+                cleanData = cleanData.substring(commaIdx + 1);
+            }
+            byte[] videoBytes = Base64.decode(cleanData, Base64.DEFAULT);
+
+            File cacheFolder = new File(getCacheDir(), "shared_videos");
+            if (!cacheFolder.exists()) cacheFolder.mkdirs();
+            File shareFile = new File(cacheFolder, fileName);
+            FileOutputStream fos = new FileOutputStream(shareFile);
+            fos.write(videoBytes);
+            fos.flush();
+            fos.close();
+
+            Uri fileUri = Uri.fromFile(shareFile);
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType(mimeType != null && !mimeType.isEmpty() ? mimeType : "video/mp4");
+            shareIntent.putExtra(Intent.EXTRA_STREAM, fileUri);
+            shareIntent.putExtra(Intent.EXTRA_SUBJECT, fileName);
+            shareIntent.putExtra(Intent.EXTRA_TEXT, "Video HDR dari LuminaHDR");
+            shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+            startActivity(Intent.createChooser(shareIntent, "Bagikan Video Master HDR"));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void applyImmersiveMode() {
