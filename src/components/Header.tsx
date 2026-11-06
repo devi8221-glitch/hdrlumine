@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, HelpCircle, Terminal } from 'lucide-react';
+import { Sparkles, HelpCircle, Terminal, Smartphone, Download } from 'lucide-react';
 
 interface HeaderProps {
   onOpenFFmpeg?: () => void;
@@ -55,9 +55,21 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </nav>
 
-      {/* Zone 2: Clean Studio Mode Badge */}
+      {/* Zone 3: APK Android Download & Studio Mode Badge */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-800/80 border border-neutral-700/60 text-[11px] font-mono text-neutral-300">
+        <button
+          onClick={onOpenAPKInstall}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-semibold transition-all active:scale-95 cursor-pointer shadow-sm shadow-emerald-500/10"
+          title="Unduh Aplikasi Android Lengkap (17 MB Offline Standalone APK)"
+        >
+          <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Unduh APK</span>
+          <span className="text-[10px] font-mono px-1 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
+            17 MB
+          </span>
+        </button>
+
+        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-800/80 border border-neutral-700/60 text-[11px] font-mono text-neutral-300">
           <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
           <span className="font-semibold text-white">{activePresetName}</span>
         </div>

@@ -290,6 +290,16 @@ export const VideoReviewModal: React.FC<VideoReviewModalProps> = ({
                 <Sliders className="w-3.5 h-3.5" />
                 <span>Edit Ulang / Lanjut Sesuaikan Parameter</span>
               </button>
+
+              {/* Quaternary: Download APK standalone */}
+              <a
+                href="/LuminaHDR_v1.0.apk"
+                download="LuminaHDR_v1.0.apk"
+                className="w-full py-2 text-[11px] text-emerald-400/90 hover:text-emerald-300 transition-colors flex items-center justify-center gap-1.5 border-t border-neutral-800/80 mt-1 pt-2.5"
+              >
+                <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Download Aplikasi LuminaHDR.apk (17 MB Offline)</span>
+              </a>
             </div>
           </div>
         </div>

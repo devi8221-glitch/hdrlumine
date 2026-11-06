@@ -160,6 +160,7 @@ export default function App() {
             activeLUT ? ` • ${activeLUT.name.split(' ')[0]}` : ''
           }`}
           isCustom={false}
+          onOpenAPKInstall={() => setIsAPKModalOpen(true)}
         />
       )}
 
