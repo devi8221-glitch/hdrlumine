@@ -37,20 +37,46 @@ jobs:
           distribution: 'temurin'
           java-version: 17
 
-      - name: 6. Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: 7. Install Android Build Tools & Platform
+      - name: 6. Configure Android SDK & Build Tools
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-33" "build-tools;33.0.2"
+          echo "Configuring Android SDK from $ANDROID_HOME..."
+          export ANDROID_HOME=${ANDROID_HOME:-/usr/local/lib/android/sdk}
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
 
-      - name: 8. Build & Sign Standalone APK
+          # Detect available cmdline-tools / sdkmanager without calling deprecated 'tools' package
+          SDK_MGR=""
+          for sm in \
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "$ANDROID_HOME/cmdline-tools/16.0/bin/sdkmanager" \
+            "$ANDROID_HOME/cmdline-tools/*/bin/sdkmanager"; do
+            if [ -x "$sm" ]; then
+              SDK_MGR="$sm"
+              break
+            fi
+          done
+
+          if [ -n "$SDK_MGR" ]; then
+            echo "Using sdkmanager at $SDK_MGR"
+            yes | "$SDK_MGR" --licenses || true
+            "$SDK_MGR" "platforms;android-34" "build-tools;34.0.0" "platform-tools" || true
+          fi
+
+          # Add latest build-tools (aapt, zipalign, apksigner, d8) to PATH
+          if [ -d "$ANDROID_HOME/build-tools" ]; then
+            LATEST_BT=$(ls -d $ANDROID_HOME/build-tools/* 2>/dev/null | sort -V | tail -n 1)
+            if [ -n "$LATEST_BT" ] && [ -d "$LATEST_BT" ]; then
+              echo "Adding build-tools to PATH: $LATEST_BT"
+              echo "$LATEST_BT" >> $GITHUB_PATH
+            fi
+          fi
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+
+      - name: 7. Build & Sign Standalone APK
         run: |
           chmod +x ./scripts/build-apk.sh
           ./scripts/build-apk.sh
 
-      - name: 9. Upload APK Artifact
+      - name: 8. Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: LuminaHDR-v1.0-release-apk
@@ -58,7 +84,7 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
-      - name: 10. Create GitHub Release (On Tags)
+      - name: 9. Create GitHub Release (On Tags)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:

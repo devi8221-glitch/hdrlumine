@@ -116,12 +116,17 @@ aapt package -f -M "$BUILD_DIR/AndroidManifest.xml" -S "$BUILD_DIR/res" -A "$BUI
 zipalign -v -p 4 "$BUILD_DIR/bin/app.unsigned.apk" "$BUILD_DIR/bin/app.aligned.apk"
 
 # 11. Sign APK with v1, v2, v3
-apksigner sign --ks "$BUILD_DIR/release.keystore" --ks-pass pass:luminahdr123 --out "$ROOT_DIR/public/LuminaHDR_v1.0.apk" "$BUILD_DIR/bin/app.aligned.apk"
+apksigner sign --ks "$BUILD_DIR/release.keystore" --ks-pass pass:luminahdr123 --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true --out "$ROOT_DIR/public/LuminaHDR_v1.0.apk" "$BUILD_DIR/bin/app.aligned.apk"
 mkdir -p "$ROOT_DIR/dist"
 cp "$ROOT_DIR/public/LuminaHDR_v1.0.apk" "$ROOT_DIR/dist/LuminaHDR_v1.0.apk"
 
-# 12. Verify
+# 12. Menyuntikkan stabilitas Android 14, 12 Profil 3D LUT, dan Pustaka Native
+echo "Menyuntikkan 12 profil 3D LUT dan stabilitas Android 14..."
+python3 "$ROOT_DIR/scripts/inject_android_stability.py"
+
+# 13. Verify
 apksigner verify -v "$ROOT_DIR/public/LuminaHDR_v1.0.apk"
 
 echo "=== APK Berhasil Dibangun: $ROOT_DIR/public/LuminaHDR_v1.0.apk ==="
 ls -lh "$ROOT_DIR/public/LuminaHDR_v1.0.apk"
+
