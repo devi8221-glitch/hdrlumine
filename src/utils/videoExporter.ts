@@ -15,6 +15,7 @@ export class VideoStreamRecorder {
   private recordedChunks: Blob[] = [];
   private isRecording: boolean = false;
   private progressInterval: number | null = null;
+  private cleanups: (() => void)[] = [];
 
   public async startRecording(
     canvas: HTMLCanvasElement,
@@ -22,32 +23,34 @@ export class VideoStreamRecorder {
     options: ExportOptions
   ) {
     this.recordedChunks = [];
+    this.cleanups.forEach((fn) => fn());
+    this.cleanups = [];
     this.isRecording = true;
 
     try {
-      const stream = canvas.captureStream(options.fps || 60);
+      const stream = canvas.captureStream(options.fps || 30);
 
-      // Attempt to attach audio if available
+      // Attempt to attach audio track smoothly
       if (audioElement) {
         try {
-          const audioTrack = (audioElement as any).captureStream?.()?.getAudioTracks()?.[0];
-          if (audioTrack) {
+          const audioTrack = (audioElement as any).captureStream?.()?.getAudioTracks()?.[0]
+            || (audioElement as any).mozCaptureStream?.()?.getAudioTracks()?.[0];
+          if (audioTrack && audioTrack.readyState === 'live') {
             stream.addTrack(audioTrack);
           }
         } catch {
-          // Canvas video-only recording if audio capture is restricted
+          // Video-only stream if audio capture is restricted
         }
       }
 
-      // Prioritize High-Profile AVC/H.264 & VP9 with crystal-clear quantization
+      // Prioritize High-Profile AVC/H.264 & VP9 for wide mobile compatibility
       const mimeTypes = [
-        'video/mp4;codecs=avc1.64002a,mp4a.40.2', // High Profile Level 4.2 (Sharp 1080p60)
-        'video/mp4;codecs=avc1.640028,mp4a.40.2', // High Profile Level 4.0
-        'video/mp4;codecs=avc1.4d4028,mp4a.40.2', // Main Profile
-        'video/mp4;codecs=avc1,mp4a.40.2',
+        'video/mp4;codecs=avc1.4d4028,mp4a.40.2', // Main Profile H.264 (Most fluid on Android)
+        'video/mp4;codecs=avc1.640028,mp4a.40.2', // High Profile H.264
+        'video/mp4;codecs=avc1',
         'video/mp4',
-        'video/webm;codecs=vp09.00.41.08,opus',     // VP9 Profile 0 Level 4.1 (Clean 4K/1080p)
         'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp09.00.41.08,opus',
         'video/webm;codecs=h264,opus',
         'video/webm;codecs=vp8,opus',
         'video/webm',
@@ -60,14 +63,14 @@ export class VideoStreamRecorder {
         }
       }
 
-      // High bitrate for pristine, uncompressed visual fidelity (35 Mbps default, or user chosen)
+      // 14 Mbps default: optimal sweet spot between crystal-clear HDR clarity and buttery-smooth mobile hardware encoding
       const targetBps = (options.bitrateMbps && options.bitrateMbps > 0)
         ? Math.round(options.bitrateMbps * 1000000)
-        : 35000000; // 35 Mbps studio quality
+        : 14000000;
 
       const recorderOptions: MediaRecorderOptions = {
         videoBitsPerSecond: targetBps,
-        audioBitsPerSecond: 320000,
+        audioBitsPerSecond: 192000,
       };
       if (selectedMime) {
         recorderOptions.mimeType = selectedMime;
@@ -90,6 +93,8 @@ export class VideoStreamRecorder {
           clearInterval(this.progressInterval);
           this.progressInterval = null;
         }
+        this.cleanups.forEach((fn) => fn());
+        this.cleanups = [];
 
         const ext = selectedMime.includes('mp4') ? 'mp4' : 'webm';
         const finalBlob = new Blob(this.recordedChunks, {
@@ -100,9 +105,39 @@ export class VideoStreamRecorder {
         options.onComplete(blobUrl, finalName);
       };
 
-      this.mediaRecorder.start(250); // Timeslice 250ms
+      // Hook into video element playback events for precise frame-timing
+      if (audioElement) {
+        const onTimeUpdate = () => {
+          if (!this.isRecording) return;
+          const cur = audioElement.currentTime;
+          const dur = options.durationSeconds;
+          const percent = Math.min(99, Math.floor((cur / dur) * 100));
+          options.onProgress(percent, Math.floor(cur), Math.ceil(dur));
 
-      // Progress reporting timer
+          if (cur >= dur || audioElement.ended) {
+            this.stopRecording();
+          }
+        };
+
+        const onEnded = () => {
+          if (this.isRecording) {
+            this.stopRecording();
+          }
+        };
+
+        audioElement.addEventListener('timeupdate', onTimeUpdate);
+        audioElement.addEventListener('ended', onEnded, { once: true });
+
+        this.cleanups.push(() => {
+          audioElement.removeEventListener('timeupdate', onTimeUpdate);
+          audioElement.removeEventListener('ended', onEnded);
+        });
+      }
+
+      // Start recording with 1000ms timeslices (reduces GC pauses compared to 250ms)
+      this.mediaRecorder.start(1000);
+
+      // Backup wall-clock interval in case video element doesn't emit timeupdate
       this.progressInterval = window.setInterval(() => {
         if (!this.isRecording) return;
         const elapsed = performance.now() - startTime;
@@ -110,20 +145,26 @@ export class VideoStreamRecorder {
         const currentSec = Math.min(options.durationSeconds, Math.floor(elapsed / 1000));
         options.onProgress(percent, currentSec, options.durationSeconds);
 
-        if (elapsed >= targetDurationMs) {
+        if (elapsed >= targetDurationMs + 800) {
           this.stopRecording();
         }
-      }, 200);
+      }, 250);
 
     } catch (err: any) {
       this.isRecording = false;
+      this.cleanups.forEach((fn) => fn());
+      this.cleanups = [];
       options.onError(err?.message || 'Gagal memulai perekaman video di browser');
     }
   }
 
   public stopRecording() {
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-      this.mediaRecorder.stop();
+      try {
+        this.mediaRecorder.stop();
+      } catch (e) {
+        console.warn('MediaRecorder stop warning:', e);
+      }
     }
   }
 
@@ -133,8 +174,14 @@ export class VideoStreamRecorder {
       clearInterval(this.progressInterval);
       this.progressInterval = null;
     }
+    this.cleanups.forEach((fn) => fn());
+    this.cleanups = [];
     if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-      this.mediaRecorder.stop();
+      try {
+        this.mediaRecorder.stop();
+      } catch (e) {
+        console.warn('MediaRecorder cancel warning:', e);
+      }
     }
     this.recordedChunks = [];
   }

@@ -55,10 +55,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     ? videoFileName.replace(/\.[^/.]+$/, '')
     : `master_${preset.id}`;
   const [customFileName, setCustomFileName] = useState<string>(`${defaultBaseName}_tone_mapped.mp4`);
-  const [targetBitrateMbps, setTargetBitrateMbps] = useState<number>(35); // 35 Mbps default for ultra-clear video
-  const [targetFps, setTargetFps] = useState<number>(preset.targetFps || 60);
+  const [targetBitrateMbps, setTargetBitrateMbps] = useState<number>(14); // 14 Mbps: smooth hardware encoding on mobile without dropped frames
+  const [targetFps, setTargetFps] = useState<number>(30); // 30 FPS default for mobile stutter-free playback
   const [resolutionChoice, setResolutionChoice] = useState<'preset' | '720p' | '1080p' | 'source'>('preset');
-  const [audioBitrate, setAudioBitrate] = useState<'320k' | '192k' | '128k' | 'mute'>('320k');
+  const [audioBitrate, setAudioBitrate] = useState<'320k' | '192k' | '128k' | 'mute'>('192k');
   const [activeTab, setActiveTab] = useState<'quick' | 'settings'>('quick');
 
   if (!isOpen) return null;
@@ -77,10 +77,28 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     setCurrentSec(0);
     setErrorMessage(null);
 
-    // If using video element, seek to start
+    // If using video element, ensure frame-accurate sync before recording starts
     if (videoElement) {
-      videoElement.currentTime = 0;
-      videoElement.play().catch(() => {});
+      videoElement.pause();
+      // Seek to 0 and wait for seeked event so first frame is cleanly buffered
+      await new Promise<void>((resolve) => {
+        let done = false;
+        const onSeeked = () => {
+          if (done) return;
+          done = true;
+          videoElement.removeEventListener('seeked', onSeeked);
+          resolve();
+        };
+        videoElement.addEventListener('seeked', onSeeked, { once: true });
+        videoElement.currentTime = 0;
+        setTimeout(onSeeked, 300);
+      });
+
+      try {
+        await videoElement.play();
+      } catch (e) {
+        console.warn('Playback resume error:', e);
+      }
     }
 
     let exportWidth = preset.targetResolution.width;
@@ -143,7 +161,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85">
       <div className="bg-neutral-900 border border-neutral-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800 bg-neutral-900/90">
@@ -250,41 +268,49 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-neutral-400">Target Bitrate Video:</span>
-                  <span className="font-mono text-amber-400 tabular-nums">{targetBitrateMbps} Mbps</span>
+                  <span className="font-mono text-amber-400 tabular-nums font-bold">{targetBitrateMbps} Mbps</span>
                 </div>
                 <input
                   type="range"
-                  min="10"
-                  max="50"
+                  min="8"
+                  max="30"
                   step="1"
                   value={targetBitrateMbps}
                   onChange={(e) => setTargetBitrateMbps(parseInt(e.target.value, 10))}
                   className="w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
                 />
                 <div className="flex justify-between text-[10px] font-mono text-neutral-500">
-                  <span>10 Mbps (Hemat)</span>
-                  <span>20 Mbps (TikTok/IG)</span>
-                  <span className="text-amber-400 font-bold">35 Mbps (Ultra Jernih)</span>
-                  <span>50 Mbps (Cinema 4K)</span>
+                  <span>8 Mbps (Hemat)</span>
+                  <span className="text-emerald-400 font-bold">14 Mbps (Lancar & Bebas Patah)</span>
+                  <span>20 Mbps (Studio HD)</span>
+                  <span>30 Mbps (Cinema)</span>
                 </div>
               </div>
 
               {/* Framerate Selection */}
               <div className="space-y-1.5">
-                <label className="text-neutral-400 block">Framerate (FPS):</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-neutral-400 block">Framerate (FPS):</label>
+                  <span className="text-[10px] font-mono text-emerald-400">
+                    {targetFps === 30 ? '✓ Rekomendasi Bebas Patah-patah' : 'Mode 60 FPS'}
+                  </span>
+                </div>
                 <div className="grid grid-cols-3 gap-2">
                   {[24, 30, 60].map((fps) => (
                     <button
                       key={fps}
                       type="button"
                       onClick={() => setTargetFps(fps)}
-                      className={`py-1.5 rounded-lg border font-mono text-xs transition-colors cursor-pointer ${
+                      className={`py-2 rounded-lg border font-mono text-xs transition-colors cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
                         targetFps === fps
                           ? 'bg-amber-400 text-neutral-950 font-bold border-amber-400'
                           : 'bg-neutral-950 text-neutral-300 border-neutral-800 hover:bg-neutral-800'
                       }`}
                     >
-                      {fps} FPS
+                      <span className="font-bold">{fps} FPS</span>
+                      <span className="text-[9px] opacity-80 font-normal">
+                        {fps === 30 ? 'Paling Stabil' : fps === 60 ? 'Ultra Mulus' : 'Sinematik'}
+                      </span>
                     </button>
                   ))}
                 </div>

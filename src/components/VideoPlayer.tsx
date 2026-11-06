@@ -68,6 +68,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [currentTime, setCurrentTime] = useState<number>(0);
+  const lastTimeUpdateRef = useRef<number>(0);
   const [duration, setDuration] = useState<number>(15);
   const [isMuted, setIsMuted] = useState<boolean>(true);
   const [splitPosition, setSplitPosition] = useState<number>(0.5);
@@ -140,7 +141,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           settings
         );
         if (!videoRef.current.paused && !videoRef.current.ended) {
-          setCurrentTime(videoRef.current.currentTime);
+          const now = performance.now();
+          if (now - lastTimeUpdateRef.current > 250) {
+            lastTimeUpdateRef.current = now;
+            setCurrentTime(videoRef.current.currentTime);
+          }
         }
       }
     } else if (demoGeneratorRef.current) {
