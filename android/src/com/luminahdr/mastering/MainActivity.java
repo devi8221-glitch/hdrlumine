@@ -313,12 +313,7 @@ public class MainActivity extends Activity {
 
     private void shareVideoFile(String base64Data, String fileName, String mimeType) {
         try {
-            String cleanData = base64Data;
-            int commaIdx = cleanData.indexOf(",");
-            if (commaIdx != -1) {
-                cleanData = cleanData.substring(commaIdx + 1);
-            }
-            byte[] videoBytes = Base64.decode(cleanData, Base64.DEFAULT);
+            byte[] videoBytes = VideoStorageManager.decodeRobustBase64(base64Data);
 
             File cacheFolder = new File(getCacheDir(), "shared_videos");
             if (!cacheFolder.exists()) cacheFolder.mkdirs();

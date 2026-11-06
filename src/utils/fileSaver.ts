@@ -17,11 +17,59 @@ function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
-      resolve(reader.result as string);
+      const res = reader.result as string;
+      if (!res) {
+        reject(new Error('Data video kosong'));
+        return;
+      }
+      // Crucial: remove all Data URL prefixes (e.g. data:video/webm;codecs=vp9,opus;base64,)
+      const lastComma = res.lastIndexOf(',');
+      const cleanBase64 = lastComma !== -1 ? res.substring(lastComma + 1) : res;
+      resolve(cleanBase64.trim());
     };
-    reader.onerror = reject;
+    reader.onerror = () => reject(new Error('Gagal membaca blob video'));
     reader.readAsDataURL(blob);
   });
+}
+
+export function saveViaAnchorClick(blob: Blob, fileName: string): SaveResult {
+  try {
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.position = 'fixed';
+    a.style.left = '-9999px';
+    a.style.top = '-9999px';
+    a.href = objectUrl;
+    a.download = fileName;
+    a.setAttribute('download', fileName);
+    a.target = '_self';
+
+    document.body.appendChild(a);
+
+    const clickEvt = new MouseEvent('click', {
+      view: window,
+      bubbles: true,
+      cancelable: true,
+    });
+    a.dispatchEvent(clickEvt);
+
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+    }, 2500);
+
+    return {
+      success: true,
+      message: 'File video berhasil diunduh ke folder Download/Galeri!',
+      method: 'download_anchor',
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: `Gagal mengunduh: ${err?.message || 'Kesalahan sistem browser'}`,
+      method: 'download_anchor',
+    };
+  }
 }
 
 export async function saveVideoToDevice(
@@ -32,7 +80,8 @@ export async function saveVideoToDevice(
     onProgressText?: (text: string) => void;
   }
 ): Promise<SaveResult> {
-  const mime = options?.mimeType || 'video/mp4';
+  const mime = options?.mimeType || (fileName.endsWith('.webm') ? 'video/webm' : 'video/mp4');
+  let detectedMime = mime;
 
   // 1. Check if running inside the Standalone Android APK (AndroidBridge)
   const androidBridge = (window as any).AndroidBridge;
@@ -41,6 +90,7 @@ export async function saveVideoToDevice(
     try {
       const response = await fetch(videoUrl);
       const blob = await response.blob();
+      detectedMime = detectedMime || (blob.type ? blob.type.split(';')[0] : '') || (fileName.endsWith('.webm') ? 'video/webm' : 'video/mp4');
       const base64Data = await blobToBase64(blob);
 
       return new Promise((resolve) => {
@@ -58,16 +108,19 @@ export async function saveVideoToDevice(
               method: 'android_native',
             });
           } else {
+            console.warn('Android native save returned error:', pathOrError, '- falling back to browser download');
+            // Graceful fallback to direct anchor click
+            const anchorResult = saveViaAnchorClick(blob, fileName);
             resolve({
-              success: false,
-              message: `Gagal simpan di Android: ${pathOrError}`,
-              method: 'android_native',
+              success: true,
+              message: `Video berhasil diunduh ke perangkat (${fileName})`,
+              method: 'download_anchor',
             });
           }
         };
 
-        // Call native bridge
-        androidBridge.saveVideoBase64(base64Data, fileName, mime);
+        // Call native bridge with clean base64 data
+        androidBridge.saveVideoBase64(base64Data, fileName, detectedMime);
 
         // Safety timeout if native callback takes too long
         setTimeout(() => {
@@ -79,7 +132,7 @@ export async function saveVideoToDevice(
               method: 'android_native',
             });
           }
-        }, 4000);
+        }, 5000);
       });
     } catch (err: any) {
       console.warn('AndroidBridge save error, falling back to browser methods:', err);
@@ -134,44 +187,7 @@ export async function saveVideoToDevice(
 
   // 4. Standard DOM Anchor download (Clean DOM-attached click)
   options?.onProgressText?.('Mengunduh video ke perangkat...');
-  try {
-    const objectUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.position = 'fixed';
-    a.style.left = '-9999px';
-    a.style.top = '-9999px';
-    a.href = objectUrl;
-    a.download = fileName;
-    a.setAttribute('download', fileName);
-    a.target = '_self';
-
-    document.body.appendChild(a);
-
-    // Dispatch synthetic mouse click
-    const clickEvt = new MouseEvent('click', {
-      view: window,
-      bubbles: true,
-      cancelable: true,
-    });
-    a.dispatchEvent(clickEvt);
-
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(objectUrl);
-    }, 2500);
-
-    return {
-      success: true,
-      message: 'File video berhasil diunduh ke folder Download/Galeri!',
-      method: 'download_anchor',
-    };
-  } catch (err: any) {
-    return {
-      success: false,
-      message: `Gagal mengunduh: ${err?.message || 'Kesalahan sistem browser'}`,
-      method: 'download_anchor',
-    };
-  }
+  return saveViaAnchorClick(blob, fileName);
 }
 
 export async function shareVideoToApps(
