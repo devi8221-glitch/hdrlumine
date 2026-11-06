@@ -55,8 +55,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     ? videoFileName.replace(/\.[^/.]+$/, '')
     : `master_${preset.id}`;
   const [customFileName, setCustomFileName] = useState<string>(`${defaultBaseName}_tone_mapped.mp4`);
-  const [targetBitrateMbps, setTargetBitrateMbps] = useState<number>(preset.targetBitrateMbps);
-  const [targetFps, setTargetFps] = useState<number>(preset.targetFps);
+  const [targetBitrateMbps, setTargetBitrateMbps] = useState<number>(35); // 35 Mbps default for ultra-clear video
+  const [targetFps, setTargetFps] = useState<number>(preset.targetFps || 60);
   const [resolutionChoice, setResolutionChoice] = useState<'preset' | '720p' | '1080p' | 'source'>('preset');
   const [audioBitrate, setAudioBitrate] = useState<'320k' | '192k' | '128k' | 'mute'>('320k');
   const [activeTab, setActiveTab] = useState<'quick' | 'settings'>('quick');
@@ -101,6 +101,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       width: exportWidth,
       height: exportHeight,
       fileName: safeName,
+      bitrateMbps: targetBitrateMbps,
       onProgress: (p, cur) => {
         setProgress(p);
         setCurrentSec(cur);
@@ -253,17 +254,18 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 </div>
                 <input
                   type="range"
-                  min="3"
-                  max="30"
+                  min="10"
+                  max="50"
                   step="1"
                   value={targetBitrateMbps}
                   onChange={(e) => setTargetBitrateMbps(parseInt(e.target.value, 10))}
                   className="w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
                 />
                 <div className="flex justify-between text-[10px] font-mono text-neutral-500">
-                  <span>3 Mbps (WA Hemat)</span>
-                  <span>18 Mbps (IG / TikTok)</span>
-                  <span>30 Mbps (Pro)</span>
+                  <span>10 Mbps (Hemat)</span>
+                  <span>20 Mbps (TikTok/IG)</span>
+                  <span className="text-amber-400 font-bold">35 Mbps (Ultra Jernih)</span>
+                  <span>50 Mbps (Cinema 4K)</span>
                 </div>
               </div>
 

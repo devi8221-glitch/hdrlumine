@@ -4,6 +4,7 @@ export interface ExportOptions {
   width: number;
   height: number;
   fileName: string;
+  bitrateMbps?: number;
   onProgress: (percent: number, currentSec: number, totalSec: number) => void;
   onComplete: (blobUrl: string, fileName: string) => void;
   onError: (errorMsg: string) => void;
@@ -24,7 +25,7 @@ export class VideoStreamRecorder {
     this.isRecording = true;
 
     try {
-      const stream = canvas.captureStream(options.fps);
+      const stream = canvas.captureStream(options.fps || 60);
 
       // Attempt to attach audio if available
       if (audioElement) {
@@ -38,12 +39,17 @@ export class VideoStreamRecorder {
         }
       }
 
-      // Determine best supported mimeType
+      // Prioritize High-Profile AVC/H.264 & VP9 with crystal-clear quantization
       const mimeTypes = [
+        'video/mp4;codecs=avc1.64002a,mp4a.40.2', // High Profile Level 4.2 (Sharp 1080p60)
+        'video/mp4;codecs=avc1.640028,mp4a.40.2', // High Profile Level 4.0
+        'video/mp4;codecs=avc1.4d4028,mp4a.40.2', // Main Profile
         'video/mp4;codecs=avc1,mp4a.40.2',
         'video/mp4',
+        'video/webm;codecs=vp09.00.41.08,opus',     // VP9 Profile 0 Level 4.1 (Clean 4K/1080p)
         'video/webm;codecs=vp9,opus',
-        'video/webm;codecs=h264',
+        'video/webm;codecs=h264,opus',
+        'video/webm;codecs=vp8,opus',
         'video/webm',
       ];
       let selectedMime = '';
@@ -54,8 +60,14 @@ export class VideoStreamRecorder {
         }
       }
 
+      // High bitrate for pristine, uncompressed visual fidelity (35 Mbps default, or user chosen)
+      const targetBps = (options.bitrateMbps && options.bitrateMbps > 0)
+        ? Math.round(options.bitrateMbps * 1000000)
+        : 35000000; // 35 Mbps studio quality
+
       const recorderOptions: MediaRecorderOptions = {
-        videoBitsPerSecond: 16000000, // 16 Mbps
+        videoBitsPerSecond: targetBps,
+        audioBitsPerSecond: 320000,
       };
       if (selectedMime) {
         recorderOptions.mimeType = selectedMime;

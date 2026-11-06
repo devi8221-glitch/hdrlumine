@@ -16,6 +16,7 @@ export const DEFAULT_SETTINGS: ColorGradingSettings = {
   inputProfile: 'hdr10_pq',
   lutId: 'none',
   lutIntensity: 1.0,
+  clarity: 0.35,
 };
 
 export const TIKTOK_PRESET: PlatformPresetConfig = {
@@ -45,6 +46,7 @@ export const TIKTOK_PRESET: PlatformPresetConfig = {
     inputProfile: 'hdr10_pq',
     lutId: 'none',
     lutIntensity: 1.0,
+    clarity: 0.38,
   },
   colorSpaceTag: {
     primaries: 'bt2020',
@@ -81,6 +83,7 @@ export const INSTAGRAM_PRESET: PlatformPresetConfig = {
     inputProfile: 'dolby_vision_hlg',
     lutId: 'none',
     lutIntensity: 1.0,
+    clarity: 0.35,
   },
   colorSpaceTag: {
     primaries: 'bt2020',
@@ -117,6 +120,7 @@ export const WHATSAPP_PRESET: PlatformPresetConfig = {
     inputProfile: 'hdr10_pq',
     lutId: 'none',
     lutIntensity: 1.0,
+    clarity: 0.40,
   },
   colorSpaceTag: {
     primaries: 'bt709',

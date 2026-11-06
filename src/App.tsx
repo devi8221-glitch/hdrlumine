@@ -54,8 +54,9 @@ export default function App() {
     name: 'Sunset_Golden_Hour_HDR.mp4',
   });
 
-  // Modals
+  // Modals & Export Flow
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
+  const [savedSplitMode, setSavedSplitMode] = useState<SplitViewMode>('split_wipe');
   const [isAPKModalOpen, setIsAPKModalOpen] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [reviewResult, setReviewResult] = useState<{
@@ -64,6 +65,17 @@ export default function App() {
     sizeBytes: number;
     durationSeconds: number;
   } | null>(null);
+
+  const handleOpenExport = () => {
+    setSavedSplitMode(splitMode);
+    setSplitMode('off'); // Force 100% full-frame mastered HDR render during export
+    setIsExportOpen(true);
+  };
+
+  const handleCloseExport = () => {
+    setSplitMode(savedSplitMode);
+    setIsExportOpen(false);
+  };
 
   // Video File Management
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -427,6 +439,27 @@ export default function App() {
                     />
                   </div>
 
+                  {/* Kejernihan Ultra & Micro-Contrast (Crystal Clear Detail Enhancement) */}
+                  <div className="flex-1 space-y-0.5">
+                    <div className="flex items-center justify-between text-[11px] text-neutral-400">
+                      <span>Kejernihan Ultra</span>
+                      <span className="font-mono text-amber-400 tabular-nums">
+                        {Math.round((settings.clarity ?? 0.35) * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.0"
+                      max="0.80"
+                      step="0.05"
+                      value={settings.clarity ?? 0.35}
+                      onChange={(e) =>
+                        setSettings((s) => ({ ...s, clarity: parseFloat(e.target.value) }))
+                      }
+                      className="w-full h-1.5 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                    />
+                  </div>
+
                   {/* Reset button */}
                   <button
                     onClick={() => {
@@ -459,7 +492,7 @@ export default function App() {
                 {/* Primary Action Button */}
                 <div className="w-full sm:w-auto shrink-0">
                   <button
-                    onClick={() => setIsExportOpen(true)}
+                    onClick={handleOpenExport}
                     className={`w-full sm:w-auto px-5 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95 cursor-pointer ${
                       activePlatform === 'tiktok'
                         ? 'bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white shadow-pink-500/25'
@@ -482,7 +515,7 @@ export default function App() {
       {isExportOpen && (
         <ExportModal
           isOpen={isExportOpen}
-          onClose={() => setIsExportOpen(false)}
+          onClose={handleCloseExport}
           preset={activePresetConfig}
           settings={settings}
           canvas={canvasRef}
@@ -491,7 +524,7 @@ export default function App() {
           videoFileName={videoMeta.name}
           onOpenFFmpeg={() => {}}
           onOpenReview={(res) => {
-            setIsExportOpen(false);
+            handleCloseExport();
             setReviewResult(res);
           }}
         />

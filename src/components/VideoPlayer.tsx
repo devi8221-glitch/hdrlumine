@@ -130,7 +130,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     if (!shaderEngineRef.current || !canvasRef.current) return;
 
     if (isUsingCustomVideo && videoRef.current) {
-      if (!videoRef.current.paused && !videoRef.current.ended) {
+      if (videoRef.current.readyState >= 2) {
         shaderEngineRef.current.render(
           videoRef.current,
           outputMode,
@@ -139,7 +139,9 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           isHoldingOriginal,
           settings
         );
-        setCurrentTime(videoRef.current.currentTime);
+        if (!videoRef.current.paused && !videoRef.current.ended) {
+          setCurrentTime(videoRef.current.currentTime);
+        }
       }
     } else if (demoGeneratorRef.current) {
       const demoCanvas = demoGeneratorRef.current.getCanvas();

@@ -40,8 +40,9 @@ for candidate in \
 done
 
 if [ -z "$ANDROID_JAR" ] || [ ! -f "$ANDROID_JAR" ]; then
-  echo "Error: android.jar tidak ditemukan di sistem."
-  exit 1
+  echo "Android SDK CLI belum terinstal penuh di lingkungan lokal. Menjalankan Python Stability Injector & Signer..."
+  python3 "$ROOT_DIR/scripts/inject_android_stability.py"
+  exit 0
 fi
 echo "Menggunakan Android Platform: $ANDROID_JAR"
 

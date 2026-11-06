@@ -44,6 +44,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        CrashHandler.install(this);
         super.onCreate(savedInstanceState);
 
         // 1. Fullscreen window configuration
@@ -221,59 +222,68 @@ public class MainActivity extends Activity {
                 }
             }).start();
         }
+
+        @android.webkit.JavascriptInterface
+        public void vibrate(long milliseconds) {
+            try {
+                android.os.Vibrator v = (android.os.Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                if (v != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        v.vibrate(android.os.VibrationEffect.createOneShot(milliseconds, android.os.VibrationEffect.DEFAULT_AMPLITUDE));
+                    } else {
+                        v.vibrate(milliseconds);
+                    }
+                }
+            } catch (Exception ignored) {}
+        }
+
+        @android.webkit.JavascriptInterface
+        public String getDeviceInfo() {
+            return GLCompatHelper.getDeviceInfoJSON(MainActivity.this);
+        }
+
+        @android.webkit.JavascriptInterface
+        public void showToast(final String message) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        @android.webkit.JavascriptInterface
+        public void keepScreenOn(final boolean keepOn) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if (keepOn) {
+                        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    } else {
+                        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                    }
+                }
+            });
+        }
     }
 
     private void saveFileToStorage(String base64Data, String fileName, String mimeType) {
         try {
-            String cleanData = base64Data;
-            int commaIdx = cleanData.indexOf(",");
-            if (commaIdx != -1) {
-                cleanData = cleanData.substring(commaIdx + 1);
-            }
-
-            byte[] videoBytes = Base64.decode(cleanData, Base64.DEFAULT);
-
-            // Prefer Movies/LuminaHDR folder so it appears in video players and galleries
-            File targetDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES);
-            if (targetDir == null) {
-                targetDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-            }
-            File luminaFolder = new File(targetDir, "LuminaHDR");
-            if (!luminaFolder.exists()) {
-                luminaFolder.mkdirs();
-            }
-
-            final File outputFile = new File(luminaFolder, fileName);
-            FileOutputStream fos = new FileOutputStream(outputFile);
-            fos.write(videoBytes);
-            fos.flush();
-            fos.close();
-
-            // Scan file to trigger Android MediaStore / Gallery refresh
-            MediaScannerConnection.scanFile(
-                MainActivity.this,
-                new String[]{outputFile.getAbsolutePath()},
-                new String[]{mimeType != null && !mimeType.isEmpty() ? mimeType : "video/mp4"},
-                new MediaScannerConnection.OnScanCompletedListener() {
-                    @Override
-                    public void onScanCompleted(String path, Uri uri) {
-                        // Scan complete
-                    }
-                }
-            );
+            VideoStorageManager manager = new VideoStorageManager(MainActivity.this);
+            final String savedPath = manager.saveVideoBase64(base64Data, fileName, mimeType);
 
             runOnUiThread(new Runnable() {
                 @Override
                 public void run() {
                     Toast.makeText(
                         MainActivity.this,
-                        "✓ Berhasil disimpan di Galeri:\n" + outputFile.getName(),
+                        "✓ Berhasil disimpan di Galeri:\n" + fileName,
                         Toast.LENGTH_LONG
                     ).show();
 
                     if (webView != null) {
                         webView.evaluateJavascript(
-                            "window.onAndroidSaveResult && window.onAndroidSaveResult(true, '" + outputFile.getAbsolutePath().replace("'", "\\'") + "');",
+                            "window.onAndroidSaveResult && window.onAndroidSaveResult(true, '" + savedPath.replace("'", "\\'") + "');",
                             null
                         );
                     }

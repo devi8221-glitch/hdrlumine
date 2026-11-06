@@ -21,8 +21,10 @@ out vec4 outColor;
 
 uniform sampler2D u_image;
 uniform highp sampler3D u_lut3d;
-uniform float u_lutIntensity;
-uniform int u_hasLut;
+uniform int u_presetMode;          // 0=Natural, 1=TealOrange, 2=Kodak500T, 3=GoldenHour, 4=Cyberpunk, 5=Emerald, 6=Fuji, 7=Vintage, 8=Noir, 9=Custom3D
+uniform float u_lutIntensity;      // 0.0 to 1.0
+uniform float u_lutSize;           // Size of custom LUT (e.g. 33.0)
+uniform int u_hasCustomLut;        // 1 if custom LUT texture is loaded
 
 uniform int u_outputMode;          // 0 = HDR10 (ST 2084 PQ 1000 Nits), 1 = Dolby Vision (Profile 8.4 HLG)
 uniform float u_brightnessBoost;   // 0.8 to 1.6 (Peak Luminance scaling)
@@ -33,16 +35,127 @@ uniform int u_splitMode;           // 0=off (Mastered), 1=split_wipe, 2=side_by_
 uniform float u_splitPosition;     // 0.0 to 1.0
 uniform int u_showOriginal;        // 1 = force 100% original video
 
-// 3D LUT lookup with half-cell boundary correction
-vec3 apply3DLUT(vec3 inColor) {
-  if (u_hasLut == 0 || u_lutIntensity <= 0.001) {
-    return inColor;
+uniform float u_clarity;           // 0.0 to 1.0 (Spatial micro-contrast and edge clarity boost)
+uniform vec2 u_resolution;         // Video render canvas pixel dimensions
+
+// High-fidelity spatial micro-contrast & edge clarity filter ("Super Jernih & Tajam")
+vec3 applySpatialClarity(sampler2D tex, vec2 uv, vec3 centerColor, float clarity, vec2 res) {
+  if (clarity <= 0.01) return centerColor;
+
+  vec2 texel = 1.0 / max(res, vec2(720.0, 1280.0));
+  vec3 up    = texture(tex, uv + vec2(0.0, texel.y)).rgb;
+  vec3 down  = texture(tex, uv - vec2(0.0, texel.y)).rgb;
+  vec3 left  = texture(tex, uv - vec2(texel.x, 0.0)).rgb;
+  vec3 right = texture(tex, uv + vec2(texel.x, 0.0)).rgb;
+
+  vec3 blur = (up + down + left + right) * 0.25;
+  vec3 highPass = centerColor - blur;
+
+  // Gentle non-linear limit to preserve natural skin tones while making footage razor-sharp
+  vec3 sharpened = centerColor + clamp(highPass * (clarity * 2.2), -0.16, 0.16);
+  return clamp(sharpened, 0.0, 1.0);
+}
+
+// Robust procedural color grading preset engine (Zero-allocation, 100% crash/blank-proof)
+vec3 applyPresetLook(vec3 inRgb, int mode) {
+  if (mode == 0) return inRgb; // Natural HDR
+
+  vec3 col = clamp(inRgb, 0.0, 1.0);
+  float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+
+  if (mode == 1) {
+    // 1. Teal & Orange Hollywood Blockbuster
+    float shadowMask = max(0.0, 1.0 - luma * 1.8);
+    col.r = clamp(col.r - shadowMask * 0.12, 0.0, 1.0);
+    col.g = clamp(col.g + shadowMask * 0.04, 0.0, 1.0);
+    col.b = clamp(col.b + shadowMask * 0.16, 0.0, 1.0);
+
+    float highlightMask = max(0.0, (luma - 0.35) * 1.5);
+    col.r = clamp(col.r + highlightMask * 0.14, 0.0, 1.0);
+    col.g = clamp(col.g + highlightMask * 0.03, 0.0, 1.0);
+    col.b = clamp(col.b - highlightMask * 0.10, 0.0, 1.0);
+
+    col = pow(max(col, vec3(0.0001)), vec3(1.08));
+    return clamp(col, 0.0, 1.0);
   }
-  float size = float(textureSize(u_lut3d, 0).x);
-  if (size <= 1.0) return inColor;
-  vec3 coord = (clamp(inColor, 0.0, 1.0) * (size - 1.0) + 0.5) / size;
-  vec3 lutColor = texture(u_lut3d, coord).rgb;
-  return mix(inColor, lutColor, clamp(u_lutIntensity, 0.0, 1.0));
+  else if (mode == 2) {
+    // 2. Kodak Vision3 500T 35mm Film
+    col.r = pow(max(col.r, 0.0001), 0.94) * 1.05;
+    col.g = pow(max(col.g, 0.0001), 0.98);
+    col.b = pow(max(col.b, 0.0001), 1.06) * 0.92;
+    float toe = max(0.0, 0.2 - luma) * 0.08;
+    col.r = clamp(col.r + toe, 0.0, 1.0);
+    col.g = clamp(col.g + toe * 0.8, 0.0, 1.0);
+    col.b = clamp(col.b + toe * 1.2, 0.0, 1.0);
+    return clamp(col, 0.0, 1.0);
+  }
+  else if (mode == 3) {
+    // 3. Golden Hour Sunset Warmth
+    col.r = pow(max(col.r, 0.0001), 0.92) * 1.14;
+    col.g = pow(max(col.g, 0.0001), 0.98) * 1.04;
+    col.b = pow(max(col.b, 0.0001), 1.15) * 0.82;
+    float warmGlow = max(0.0, luma - 0.3) * 0.18;
+    col.r = clamp(col.r + warmGlow * 1.2, 0.0, 1.0);
+    col.g = clamp(col.g + warmGlow * 0.8, 0.0, 1.0);
+    return clamp(col, 0.0, 1.0);
+  }
+  else if (mode == 4) {
+    // 4. Cyberpunk Neon Nights
+    if (luma < 0.5) {
+      col.r = clamp(col.r * 0.65, 0.0, 1.0);
+      col.g = clamp(col.g * 1.15, 0.0, 1.0);
+      col.b = clamp(col.b * 1.35, 0.0, 1.0);
+    } else {
+      col.r = clamp(col.r * 1.35, 0.0, 1.0);
+      col.g = clamp(col.g * 0.75, 0.0, 1.0);
+      col.b = clamp(col.b * 1.25, 0.0, 1.0);
+    }
+    return clamp(col, 0.0, 1.0);
+  }
+  else if (mode == 5) {
+    // 5. Emerald Mood
+    col.r = clamp(col.r * 0.82, 0.0, 1.0);
+    col.g = clamp(col.g * 1.12 + 0.02, 0.0, 1.0);
+    col.b = clamp(col.b * 0.92, 0.0, 1.0);
+    float shadow = max(0.0, 0.4 - luma) * 0.12;
+    col.g = clamp(col.g + shadow * 0.8, 0.0, 1.0);
+    col.b = clamp(col.b + shadow * 0.5, 0.0, 1.0);
+    return clamp(col, 0.0, 1.0);
+  }
+  else if (mode == 6) {
+    // 6. Fuji Pastel Matte (Soft F-Log)
+    col.r = clamp(col.r * 0.90 + 0.05, 0.0, 1.0);
+    col.g = clamp(col.g * 0.92 + 0.04, 0.0, 1.0);
+    col.b = clamp(col.b * 0.88 + 0.06, 0.0, 1.0);
+    col = mix(col, vec3(luma), 0.15);
+    return clamp(col, 0.0, 1.0);
+  }
+  else if (mode == 7) {
+    // 7. Vintage 70s Analog
+    col.r = clamp(col.r * 1.08 + 0.04, 0.0, 1.0);
+    col.g = clamp(col.g * 1.02 + 0.03, 0.0, 1.0);
+    col.b = clamp(col.b * 0.86 + 0.02, 0.0, 1.0);
+    col = mix(col, vec3(luma), 0.10);
+    return clamp(col, 0.0, 1.0);
+  }
+  else if (mode == 8) {
+    // 8. Noir B&W (Silver Halide High-Contrast)
+    float noirLuma = dot(col, vec3(0.299, 0.587, 0.114));
+    float curve = pow(clamp(noirLuma, 0.0001, 1.0), 1.25);
+    return clamp(vec3(curve), 0.0, 1.0);
+  }
+  else if (mode == 9 && u_hasCustomLut == 1 && u_lutSize > 1.0) {
+    // 9. Custom Uploaded .cube 3D LUT
+    vec3 coord = (clamp(col, 0.0, 1.0) * (u_lutSize - 1.0) + 0.5) / u_lutSize;
+    coord = clamp(coord, vec3(0.001), vec3(0.999));
+    vec3 sampled = texture(u_lut3d, coord).rgb;
+    if (isnan(sampled.r) || isinf(sampled.r) || isnan(sampled.g) || isnan(sampled.b)) {
+      return col;
+    }
+    return clamp(sampled, 0.0, 1.0);
+  }
+
+  return col;
 }
 
 // Rec.709 to Rec.2020 Wide Color Gamut matrix conversion
@@ -57,50 +170,28 @@ vec3 rec709ToRec2020(vec3 c) {
 
 // Perceptual Quantizer (SMPTE ST 2084 - HDR10) optical transfer curve
 vec3 applyHDR10_PQ(vec3 linearRgb, float peakNits, float contrast, float vibrance) {
-  // 1. Preserve skin tone luminances while expanding speculars
   float luma = dot(linearRgb, vec3(0.2627, 0.6780, 0.0593));
-  
-  // Dynamic contrast curve centered at 18% middle grey
   float midGrey = 0.18;
-  vec3 contrasted = pow(max(linearRgb / midGrey, vec3(0.0)), vec3(contrast)) * midGrey;
-  
-  // Highlight radiance expansion for 1000 nits specular punch
+  vec3 safeLinear = max(linearRgb, vec3(0.0001));
+  vec3 contrasted = pow(safeLinear / midGrey, vec3(contrast)) * midGrey;
   float nitsScale = max(1.0, peakNits / 600.0);
   vec3 expandedHighlights = contrasted + pow(max(contrasted - 0.45, vec3(0.0)), vec3(1.35)) * (0.8 * nitsScale);
-  
-  // BT.2020 Color volume expansion with natural skin tone protection
   vec3 wideGamut = mix(linearRgb, rec709ToRec2020(expandedHighlights), 0.65);
-  float satFactor = vibrance;
-  vec3 saturated = mix(vec3(luma), wideGamut, satFactor);
-  
-  // Soft highlight roll-off (anti-clipping knee)
+  vec3 saturated = mix(vec3(luma), wideGamut, vibrance);
   vec3 mastered = saturated / (saturated + vec3(0.25));
   mastered *= 1.25;
-  
   return clamp(mastered, 0.0, 1.0);
 }
 
 // Dolby Vision Profile 8.4 (Hybrid Log-Gamma Rec.2100 with dynamic scene tone mapping)
 vec3 applyDolbyVision_HLG(vec3 linearRgb, float peakNits, float contrast, float vibrance) {
-  // Dolby Vision signature: rich filmic contrast, warm specular rolloff, silky smooth highlights
   float luma = dot(linearRgb, vec3(0.2627, 0.6780, 0.0593));
-  
-  // HLG transfer approximation with smooth toe and shoulder
   vec3 filmicRgb = linearRgb;
-  
-  // Contrast adjustment with filmic S-curve
   vec3 sCurve = filmicRgb * filmicRgb * (3.0 - 2.0 * filmicRgb);
   vec3 balanced = mix(filmicRgb, sCurve, clamp(contrast - 0.6, 0.0, 0.8));
-  
-  // Dolby Vision specular warmth and highlight radiance
-  vec3 specular = pow(max(balanced, vec3(0.0)), vec3(1.2)) * (peakNits / 750.0);
-  
-  // BT.2020 rich color enhancement with organic saturation
+  vec3 specular = pow(max(balanced, vec3(0.0001)), vec3(1.2)) * (peakNits / 750.0);
   vec3 dvColor = mix(vec3(luma), specular, vibrance * 1.08);
-  
-  // Film shoulder compression for zero digital harshness
   vec3 mastered = (dvColor * (1.0 + dvColor * 0.15)) / (dvColor + vec3(0.85));
-  
   return clamp(mastered * 1.12, 0.0, 1.0);
 }
 
@@ -140,14 +231,17 @@ void main() {
   vec3 rgb = srcTex.rgb;
 
   // If ORIGINAL SIDE: render the 100% UNTOUCHED, pristine source video
-  // (No artificial washout, no fog, genuine camera output)
   if (isOriginalSide) {
     outColor = vec4(clamp(rgb, 0.0, 1.0), srcTex.a);
     return;
   }
 
-  // 1. Apply Creative Color Grading Preset / 3D LUT (Scene look)
-  vec3 gradedRgb = apply3DLUT(rgb);
+  // 0. Apply Spatial Clarity & Micro-Contrast Enhancement ("Super Jernih & Bebas Blur")
+  rgb = applySpatialClarity(u_image, uv, rgb, u_clarity, u_resolution);
+
+  // 1. Apply Creative Color Grading Preset Look with user intensity
+  vec3 styledRgb = applyPresetLook(rgb, u_presetMode);
+  vec3 gradedRgb = mix(rgb, styledRgb, clamp(u_lutIntensity, 0.0, 1.0));
 
   // 2. MASTERED HDR PIPELINE (Clean, Natural, High-Impact Tone Mapping)
   vec3 masteredRgb;
@@ -172,12 +266,15 @@ export class HDRShaderEngine {
   private lutTexture: WebGLTexture | null = null;
   private vao: WebGLVertexArrayObject | null = null;
   private isLutLoaded: boolean = false;
+  private currentLutSize: number = 33;
 
   // Uniform locations
   private uImageLoc: WebGLUniformLocation | null = null;
   private uLut3dLoc: WebGLUniformLocation | null = null;
+  private uPresetModeLoc: WebGLUniformLocation | null = null;
   private uLutIntensityLoc: WebGLUniformLocation | null = null;
-  private uHasLutLoc: WebGLUniformLocation | null = null;
+  private uLutSizeLoc: WebGLUniformLocation | null = null;
+  private uHasCustomLutLoc: WebGLUniformLocation | null = null;
   private uOutputModeLoc: WebGLUniformLocation | null = null;
   private uBrightnessBoostLoc: WebGLUniformLocation | null = null;
   private uContrastLoc: WebGLUniformLocation | null = null;
@@ -186,6 +283,8 @@ export class HDRShaderEngine {
   private uSplitModeLoc: WebGLUniformLocation | null = null;
   private uSplitPositionLoc: WebGLUniformLocation | null = null;
   private uShowOriginalLoc: WebGLUniformLocation | null = null;
+  private uClarityLoc: WebGLUniformLocation | null = null;
+  private uResolutionLoc: WebGLUniformLocation | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     const gl = canvas.getContext('webgl2', {
@@ -239,8 +338,10 @@ export class HDRShaderEngine {
     // Cache Uniform Locations
     this.uImageLoc = gl.getUniformLocation(program, 'u_image');
     this.uLut3dLoc = gl.getUniformLocation(program, 'u_lut3d');
+    this.uPresetModeLoc = gl.getUniformLocation(program, 'u_presetMode');
     this.uLutIntensityLoc = gl.getUniformLocation(program, 'u_lutIntensity');
-    this.uHasLutLoc = gl.getUniformLocation(program, 'u_hasLut');
+    this.uLutSizeLoc = gl.getUniformLocation(program, 'u_lutSize');
+    this.uHasCustomLutLoc = gl.getUniformLocation(program, 'u_hasCustomLut');
     this.uOutputModeLoc = gl.getUniformLocation(program, 'u_outputMode');
     this.uBrightnessBoostLoc = gl.getUniformLocation(program, 'u_brightnessBoost');
     this.uContrastLoc = gl.getUniformLocation(program, 'u_contrast');
@@ -249,6 +350,8 @@ export class HDRShaderEngine {
     this.uSplitModeLoc = gl.getUniformLocation(program, 'u_splitMode');
     this.uSplitPositionLoc = gl.getUniformLocation(program, 'u_splitPosition');
     this.uShowOriginalLoc = gl.getUniformLocation(program, 'u_showOriginal');
+    this.uClarityLoc = gl.getUniformLocation(program, 'u_clarity');
+    this.uResolutionLoc = gl.getUniformLocation(program, 'u_resolution');
 
     // Quad geometry (Full screen quad with flipped Y texture coords for standard video)
     const positions = new Float32Array([
@@ -302,6 +405,7 @@ export class HDRShaderEngine {
       0, 0, 255, 255,   255, 0, 255, 255,
       0, 255, 255, 255, 255, 255, 255, 255,
     ]);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA8, 2, 2, 2, 0, gl.RGBA, gl.UNSIGNED_BYTE, idData);
   }
 
@@ -311,12 +415,14 @@ export class HDRShaderEngine {
 
     if (!data || size <= 1) {
       this.isLutLoaded = false;
+      this.currentLutSize = 33;
       return;
     }
 
     try {
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_3D, this.lutTexture);
+      gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
       gl.texImage3D(
         gl.TEXTURE_3D,
         0,
@@ -329,6 +435,7 @@ export class HDRShaderEngine {
         gl.UNSIGNED_BYTE,
         data
       );
+      this.currentLutSize = size;
       this.isLutLoaded = true;
     } catch (e) {
       console.warn('Could not upload 3D LUT texture', e);
@@ -354,18 +461,32 @@ export class HDRShaderEngine {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
     gl.uniform1i(this.uImageLoc, 0);
+
+    // Map lutId to procedural preset mode
+    const lutId = settings?.lutId || 'none';
+    let presetMode = 0;
+    if (lutId.includes('teal_orange')) presetMode = 1;
+    else if (lutId.includes('kodak_500t')) presetMode = 2;
+    else if (lutId.includes('golden_hour')) presetMode = 3;
+    else if (lutId.includes('cyberpunk')) presetMode = 4;
+    else if (lutId.includes('emerald_matrix')) presetMode = 5;
+    else if (lutId.includes('fuji_film')) presetMode = 6;
+    else if (lutId.includes('vintage_vibe')) presetMode = 7;
+    else if (lutId.includes('noir')) presetMode = 8;
+    else if (lutId !== 'none' && lutId !== '') presetMode = 9; // Custom uploaded .cube LUT
+
+    gl.uniform1i(this.uPresetModeLoc, presetMode);
+    gl.uniform1f(this.uLutIntensityLoc, settings?.lutIntensity !== undefined ? settings.lutIntensity : 1.0);
+    gl.uniform1f(this.uLutSizeLoc, this.currentLutSize > 1 ? this.currentLutSize : 33.0);
+    gl.uniform1i(this.uHasCustomLutLoc, this.isLutLoaded && presetMode === 9 ? 1 : 0);
 
     // Bind 3D LUT Texture to Texture Unit 1
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_3D, this.lutTexture);
     gl.uniform1i(this.uLut3dLoc, 1);
-
-    const lutIntensity = settings?.lutIntensity !== undefined ? settings.lutIntensity : 1.0;
-    const hasLutInt = this.isLutLoaded && settings?.lutId && settings.lutId !== 'none' ? 1 : 0;
-    gl.uniform1f(this.uLutIntensityLoc, lutIntensity);
-    gl.uniform1i(this.uHasLutLoc, hasLutInt);
 
     // Uniform Values
     gl.uniform1i(this.uOutputModeLoc, outputMode === 'hdr10' ? 0 : 1);
@@ -387,6 +508,10 @@ export class HDRShaderEngine {
     gl.uniform1i(this.uSplitModeLoc, splitModeInt);
     gl.uniform1f(this.uSplitPositionLoc, splitPosition);
     gl.uniform1i(this.uShowOriginalLoc, showOriginal ? 1 : 0);
+
+    const clarityVal = settings?.clarity !== undefined ? settings.clarity : 0.35;
+    gl.uniform1f(this.uClarityLoc, clarityVal);
+    gl.uniform2f(this.uResolutionLoc, gl.canvas.width || 1080.0, gl.canvas.height || 1920.0);
 
     // Draw full screen quad
     gl.bindVertexArray(this.vao);

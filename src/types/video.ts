@@ -31,6 +31,7 @@ export interface ColorGradingSettings {
   inputProfile: InputColorProfile;
   lutId: string;              // 'none' or preset/custom LUT id
   lutIntensity: number;       // 0.0 to 1.0 (mix weight)
+  clarity?: number;           // 0.0 to 1.0 (micro-contrast and high-frequency sharpness boost)
 }
 
 export interface PlatformPresetConfig {
