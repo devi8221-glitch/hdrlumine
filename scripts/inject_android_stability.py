@@ -322,24 +322,8 @@ def main():
 })();
 """)
 
-    # 4. Inject Native Architecture ELF Shared Libraries (.so)
-    # Target sizes: ~3.5 MB per architecture to give the APK an authentic ~11-13 MB size
-    print("[5/6] Menyuntikkan pustaka native hardware acceleration (arm64-v8a, armeabi-v7a, x86_64)...")
-    native_libs = [
-        ("arm64-v8a", "libluminahdr_accel.so", 3800000),
-        ("arm64-v8a", "libgles_compat.so", 1200000),
-        ("armeabi-v7a", "libluminahdr_accel.so", 3200000),
-        ("armeabi-v7a", "libgles_compat.so", 1100000),
-        ("x86_64", "libluminahdr_accel.so", 3800000),
-        ("x86_64", "libgles_compat.so", 1200000),
-    ]
-
-    for arch, lib_name, size_bytes in native_libs:
-        lib_dir = os.path.join(extracted_apk, "lib", arch)
-        os.makedirs(lib_dir, exist_ok=True)
-        so_data = generate_elf_so(arch, size_bytes)
-        with open(os.path.join(lib_dir, lib_name), "wb") as fp:
-            fp.write(so_data)
+    # 4. Remove any legacy or invalid native libraries so APK is 100% universal DEX on Android 14-16
+    shutil.rmtree(os.path.join(extracted_apk, "lib"), ignore_errors=True)
 
     # 5. Pack APK and create canonical Android v1 JAR signature
     print("[6/6] Menghitung checksum SHA-256 dan menandatangani APK (v1 JAR Signature)...")

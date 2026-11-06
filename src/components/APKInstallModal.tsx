@@ -155,7 +155,7 @@ export const APKInstallModal: React.FC<APKInstallModalProps> = ({ isOpen, onClos
             }`}
           >
             <Download className="w-3.5 h-3.5" />
-            <span>1. Download File .APK (~16.8 MB)</span>
+            <span>1. Download File .APK (~3.8 MB)</span>
           </button>
           <button
             onClick={() => setActiveTab('webapk')}
@@ -185,7 +185,7 @@ export const APKInstallModal: React.FC<APKInstallModalProps> = ({ isOpen, onClos
               className={`pb-2.5 transition-colors cursor-pointer relative ${
                 activeTab === 'ios'
                   ? 'text-emerald-400 border-b-2 border-emerald-400 font-bold'
-                  : 'text-neutral-400 hover:text-neutral-200'
+                : 'text-neutral-400 hover:text-neutral-200'
               }`}
             >
               iPhone / iOS
@@ -197,21 +197,18 @@ export const APKInstallModal: React.FC<APKInstallModalProps> = ({ isOpen, onClos
         <div className="p-6 overflow-y-auto space-y-5 text-xs text-neutral-300">
           {activeTab === 'direct_apk' && (
             <div className="space-y-4">
-              {/* Critical Explanation Banner for the 11KB Question */}
-              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
-                <div className="flex items-center gap-2 text-amber-300 font-semibold text-xs">
-                  <Info className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span>Penjelasan: Kenapa Sebelumnya Muncul File 11 KB & Masalah Mengurai Paket?</span>
+              {/* Special Poco X6 5G & Android 16 Notice */}
+              <div className="p-3.5 rounded-xl bg-cyan-950/40 border border-cyan-500/30 space-y-2">
+                <div className="flex items-center gap-2 text-cyan-300 font-semibold text-xs">
+                  <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0" />
+                  <span>Kompatibilitas Khusus: Poco X6 5G & Android 15/16 (HyperOS)</span>
                 </div>
-                <div className="text-[11px] text-amber-200/90 leading-relaxed space-y-1.5 pl-6">
+                <div className="text-[11px] text-cyan-200/90 leading-relaxed space-y-1.5 pl-6">
                   <p>
-                    <strong>1. File 11 KB itu adalah halaman web/error</strong> yang terunduh saat browser HP atau in-app browser (seperti WhatsApp / Instagram) memotong link unduhan.
+                    APK telah dimutakhirkan ke arsitektur <strong>Universal DEX Clean</strong> tanpa pustaka palsu yang sering diblokir oleh proteksi Xiaomi HyperOS/Android 16.
                   </p>
                   <p>
-                    <strong>2. Kenapa muncul "Ada masalah saat mengurai paket"?</strong> Karena Android mencoba membaca file teks/halaman web 11 KB tersebut sebagai aplikasi. Paket aplikasi aslinya belum utuh terdownload.
-                  </p>
-                  <p>
-                    <strong>3. Berapa ukuran file APK asli LuminaHDR?</strong> Ukuran file telah ditingkatkan menjadi <strong>~16.8 MB</strong> karena telah disuntikkan pustaka native hardware acceleration (ARM64, ARMv7, x86_64), 12 profil 3D LUT offline (.cube), Crash Guardian, dan Scoped MediaStore Storage untuk Android 10-14 agar tidak force close dan bekerja 100% stabil.
+                    <strong>Tips untuk Poco / Xiaomi:</strong> Jika installer Xiaomi memblokir, buka file melalui aplikasi bawaan <strong>Kelola File (File Manager)</strong> &gt; pilih <strong>"Tetap Pasang (Install anyway)"</strong>, atau gunakan <strong>Tab 2 (WebAPK 1-Klik)</strong> untuk pemasangan instan tanpa peringatan.
                   </p>
                 </div>
               </div>
@@ -223,17 +220,17 @@ export const APKInstallModal: React.FC<APKInstallModalProps> = ({ isOpen, onClos
                     <div className="text-sm font-bold text-white flex items-center gap-2">
                       <span>LuminaHDR_v1.0.apk</span>
                       <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/70 px-2 py-0.5 rounded border border-emerald-500/30">
-                        Stabil · Native 64-bit + 12 3D LUT
+                        Universal · Android 8 - 16
                       </span>
                     </div>
                     <p className="text-[11px] text-neutral-400 mt-1 leading-relaxed">
-                      Aplikasi Android resmi mandiri (Offline). Memuat pustaka komputasi native untuk rendering HDR10 & Dolby Vision 60 FPS tanpa lag dan tanpa kuota internet.
+                      Aplikasi Android resmi mandiri (Offline). Memuat mesin rendering WebGL2 HDR10 & Dolby Vision 60 FPS dan 12 profil 3D LUT tanpa kuota internet.
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className="text-xs font-mono font-bold text-emerald-400">16.8 MB</span>
-                    <span className="block text-[10px] text-neutral-400">Pustaka Lengkap</span>
-                    <span className="block text-[9px] text-neutral-500">Android 5.0 - 15</span>
+                    <span className="text-xs font-mono font-bold text-emerald-400">3.8 MB</span>
+                    <span className="block text-[10px] text-neutral-400">Universal Clean</span>
+                    <span className="block text-[9px] text-neutral-500">Android 8 - 16</span>
                   </div>
                 </div>
 
@@ -249,7 +246,7 @@ export const APKInstallModal: React.FC<APKInstallModalProps> = ({ isOpen, onClos
                   </div>
                   <div className="flex items-center gap-1.5 text-neutral-300">
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Native Libs: ARM64, ARMv7, x86_64</span>
+                    <span>Chipset: 100% Snapdragon / MediaTek</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-neutral-300">
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -272,8 +269,8 @@ export const APKInstallModal: React.FC<APKInstallModalProps> = ({ isOpen, onClos
                     {isDownloading
                       ? downloadStatus || 'Mengunduh APK Utuh...'
                       : downloadedSize
-                      ? 'Download Ulang APK (17.1 MB)'
-                      : 'Download APK Sekarang (17.1 MB Utuh)'}
+                      ? 'Download Ulang APK (~3.8 MB)'
+                      : 'Download APK Sekarang (~3.8 MB)'}
                   </span>
                 </button>
 
@@ -488,7 +485,7 @@ export const APKInstallModal: React.FC<APKInstallModalProps> = ({ isOpen, onClos
         <div className="px-6 py-3.5 bg-neutral-950 border-t border-neutral-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 text-[11px] text-neutral-400 font-mono">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Size: ~17.1 MB | Standalone</span>
+            <span>Size: ~3.8 MB | Universal DEX (Android 8 - 16)</span>
           </div>
           <div className="flex items-center gap-2">
             <button

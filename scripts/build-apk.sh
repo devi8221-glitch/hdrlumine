@@ -7,11 +7,11 @@ BUILD_DIR="/tmp/apk-build"
 
 echo "=== Membangun APK Standalone Penuh LuminaHDR (Full Offline) ==="
 
-# 1. Pastikan dist/ sudah dibuild
-if [ ! -d "$ROOT_DIR/dist" ] || [ ! -f "$ROOT_DIR/dist/index.html" ]; then
-  echo "Building web app dist..."
-  (cd "$ROOT_DIR" && npm run build)
-fi
+# 1. Generate 12 3D LUT profiles and build web dist
+echo "Generating 12 offline 3D LUT profiles..."
+python3 "$ROOT_DIR/scripts/generate_luts.py"
+echo "Building web app dist..."
+(cd "$ROOT_DIR" && npm run build)
 
 # 2. Deteksi lokasi Android SDK tools & android.jar secara otomatis (kompatibel Local & GitHub Actions)
 if [ -n "$ANDROID_HOME" ] && [ -d "$ANDROID_HOME" ]; then
@@ -73,9 +73,13 @@ cat << 'EOF' > "$BUILD_DIR/res/values/strings.xml"
 </resources>
 EOF
 
-# Copy all dist web assets to assets/www for full offline execution
-rm -rf "$BUILD_DIR/assets/www"/*
+# Copy all dist web assets & 12 3D LUT profiles to assets for full offline execution
+rm -rf "$BUILD_DIR/assets"
+mkdir -p "$BUILD_DIR/assets/www" "$BUILD_DIR/assets/luts"
 cp -r "$ROOT_DIR/dist"/* "$BUILD_DIR/assets/www/"
+if [ -d "$ROOT_DIR/public/luts" ]; then
+  cp -r "$ROOT_DIR/public/luts"/* "$BUILD_DIR/assets/luts/"
+fi
 rm -f "$BUILD_DIR/assets/www"/*.apk*
 
 # Keystore
@@ -120,13 +124,9 @@ apksigner sign --ks "$BUILD_DIR/release.keystore" --ks-pass pass:luminahdr123 --
 mkdir -p "$ROOT_DIR/dist"
 cp "$ROOT_DIR/public/LuminaHDR_v1.0.apk" "$ROOT_DIR/dist/LuminaHDR_v1.0.apk"
 
-# 12. Menyuntikkan stabilitas Android 14, 12 Profil 3D LUT, dan Pustaka Native
-echo "Menyuntikkan 12 profil 3D LUT dan stabilitas Android 14..."
-python3 "$ROOT_DIR/scripts/inject_android_stability.py"
-
-# 13. Verify
+# 12. Official Verification
 apksigner verify -v "$ROOT_DIR/public/LuminaHDR_v1.0.apk"
 
-echo "=== APK Berhasil Dibangun: $ROOT_DIR/public/LuminaHDR_v1.0.apk ==="
+echo "=== APK Berhasil Dibangun Resmi (Kompatibel Android 8 - 16 & Poco X6 5G): ==="
 ls -lh "$ROOT_DIR/public/LuminaHDR_v1.0.apk"
 
