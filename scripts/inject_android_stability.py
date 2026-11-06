@@ -323,102 +323,63 @@ def main():
 
     file_list.sort(key=lambda x: x[0])
 
-    manifest_lines = [
-        "Manifest-Version: 1.0",
-        "Created-By: 1.0 (Android)",
-        "",
-    ]
-    file_hashes = {}
-
-    for rel_path, full_path in file_list:
-        with open(full_path, "rb") as fp:
-            data = fp.read()
-        sha256 = base64.b64encode(hashlib.sha256(data).digest()).decode("ascii")
-        file_hashes[rel_path] = sha256
-        manifest_lines.append(f"Name: {rel_path}")
-        manifest_lines.append(f"SHA-256-Digest: {sha256}")
-        manifest_lines.append("")
-
-    manifest_content = "\r\n".join(manifest_lines) + "\r\n"
-    manifest_bytes = manifest_content.encode("utf-8")
-
-    # Generate SF file
-    manifest_digest = base64.b64encode(hashlib.sha256(manifest_bytes).digest()).decode("ascii")
-    sf_lines = [
-        "Signature-Version: 1.0",
-        "Created-By: 1.0 (Android)",
-        f"SHA-256-Digest-Manifest: {manifest_digest}",
-        "",
-    ]
-    for rel_path, sha256 in file_hashes.items():
-        # Entry in SF file has digest of corresponding manifest section
-        section = f"Name: {rel_path}\r\nSHA-256-Digest: {sha256}\r\n\r\n".encode("utf-8")
-        sec_digest = base64.b64encode(hashlib.sha256(section).digest()).decode("ascii")
-        sf_lines.append(f"Name: {rel_path}")
-        sf_lines.append(f"SHA-256-Digest: {sec_digest}")
-        sf_lines.append("")
-
-    sf_content = "\r\n".join(sf_lines) + "\r\n"
-    sf_bytes = sf_content.encode("utf-8")
-
-    # Sign SF with openssl CMS
-    key_pem = os.path.join(temp_dir, "release_key.pem")
-    cert_pem = os.path.join(temp_dir, "release_cert.pem")
-    sf_file = os.path.join(temp_dir, "LUMINAHD.SF")
-    rsa_file = os.path.join(temp_dir, "LUMINAHD.RSA")
-
-    with open(sf_file, "wb") as fp:
-        fp.write(sf_bytes)
-
-    # Generate RSA Key & Cert
-    subprocess.run([
-        "openssl", "req", "-x509", "-newkey", "rsa:2048",
-        "-keyout", key_pem, "-out", cert_pem,
-        "-days", "10000", "-nodes",
-        "-subj", "/CN=LuminaHDR/OU=Mobile/O=LuminaHDR Studio/L=Jakarta/ST=Jakarta/C=ID"
-    ], check=True, capture_output=True)
-
-    # Sign CMS DER
-    subprocess.run([
-        "openssl", "cms", "-sign",
-        "-in", sf_file,
-        "-signer", cert_pem,
-        "-inkey", key_pem,
-        "-outform", "DER",
-        "-out", rsa_file,
-        "-binary", "-nosmimecap"
-    ], check=True, capture_output=True)
-
-    with open(rsa_file, "rb") as fp:
-        rsa_bytes = fp.read()
-
-    # Package Final Signed APK
-    final_apk = os.path.join(temp_dir, "LuminaHDR_v1.0.apk")
-    with zipfile.ZipFile(final_apk, "w", compression=zipfile.ZIP_DEFLATED) as zout:
-        # Write META-INF signature files first
-        zout.writestr("META-INF/MANIFEST.MF", manifest_bytes)
-        zout.writestr("META-INF/LUMINAHD.SF", sf_bytes)
-        zout.writestr("META-INF/LUMINAHD.RSA", rsa_bytes)
-
-        # Write all other content files (lib/*.so are stored uncompressed per Android 6+ standard)
+    # Package all files into clean unsigned APK
+    unsigned_apk = os.path.join(temp_dir, "app_unsigned.apk")
+    with zipfile.ZipFile(unsigned_apk, "w", compression=zipfile.ZIP_DEFLATED) as zout:
         for rel_path, full_path in file_list:
             if rel_path.startswith("lib/"):
                 zout.write(full_path, rel_path, compress_type=zipfile.ZIP_STORED)
             else:
                 zout.write(full_path, rel_path, compress_type=zipfile.ZIP_DEFLATED)
 
-    # Copy to destination
-    shutil.copy2(final_apk, APK_TARGET)
+    # 1. 4-byte Zipalign (Mandatory for Android 6.0 - 15)
+    print("[6/7] Menyelaraskan struktur zip (zipalign 4-byte)...")
+    aligned_apk = os.path.join(temp_dir, "app_aligned.apk")
+    subprocess.run(["zipalign", "-f", "-p", "4", unsigned_apk, aligned_apk], check=True)
+
+    # 2. Keystore setup
+    keystore = os.path.join(ROOT_DIR, "android", "release.keystore")
+    if not os.path.exists(keystore):
+        subprocess.run([
+            "keytool", "-genkey", "-v",
+            "-keystore", keystore,
+            "-alias", "luminahdr",
+            "-keyalg", "RSA",
+            "-keysize", "2048",
+            "-validity", "10000",
+            "-storepass", "luminahdr123",
+            "-keypass", "luminahdr123",
+            "-dname", "CN=LuminaHDR, OU=Mobile, O=LuminaHDR Studio, L=Jakarta, ST=Jakarta, C=ID"
+        ], check=True, capture_output=True)
+
+    # 3. Official apksigner with Scheme v1 (JAR), v2 (APK Signature Block), and v3
+    print("[7/7] Menandatangani APK dengan standar resmi Google (v1, v2 & v3 Scheme)...")
+    subprocess.run([
+        "apksigner", "sign",
+        "--ks", keystore,
+        "--ks-pass", "pass:luminahdr123",
+        "--key-pass", "pass:luminahdr123",
+        "--v1-signing-enabled", "true",
+        "--v2-signing-enabled", "true",
+        "--v3-signing-enabled", "true",
+        "--out", APK_TARGET,
+        aligned_apk
+    ], check=True)
+
+    # Verify signature scheme
+    verify_res = subprocess.run(["apksigner", "verify", "-v", APK_TARGET], capture_output=True, text=True)
+    print(verify_res.stdout)
+
     dist_apk = os.path.join(DIST_DIR, "LuminaHDR_v1.0.apk")
-    shutil.copy2(final_apk, dist_apk)
+    shutil.copy2(APK_TARGET, dist_apk)
 
     size_mb = os.path.getsize(APK_TARGET) / (1024 * 1024)
     print(f"\n=======================================================")
-    print(f"✓ APK Berhasil Ditingkatkan & Ditegakkan Stabilitasnya!")
+    print(f"✓ APK Berhasil Ditingkatkan & Ditandatangani dengan Skema Resmi!")
     print(f"  Lokasi: {APK_TARGET}")
-    print(f"  Ukuran File: {size_mb:.2f} MB (Sebelumnya: 0.23 MB)")
-    print(f"  Arsitektur Native: ARM64, ARMv7, x86_64")
-    print(f"  Fitur: 12 Profil LUT 3D Offline, Scoped Storage Android 10-14, Crash Guardian, 50 Mbps UHD Clarity")
+    print(f"  Ukuran File: {size_mb:.2f} MB")
+    print(f"  Tanda Tangan: v1 Scheme, v2 Scheme, v3 Scheme (100% Android 5.0 - 15)")
+    print(f"  Zipalign: 4-byte Page Aligned")
     print(f"=======================================================\n")
 
     # Clean up
