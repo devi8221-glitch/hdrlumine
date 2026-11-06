@@ -245,7 +245,7 @@ export const APKInstallModal: React.FC<APKInstallModalProps> = ({ isOpen, onClos
                   </div>
                   <div className="flex items-center gap-1.5 text-neutral-300">
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Tanda Tangan: v1 JAR + RSA Scheme</span>
+                    <span>Tanda Tangan: Resmi Google v2 + v3 Scheme</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-neutral-300">
                     <Check className="w-3.5 h-3.5 text-emerald-400" />
@@ -272,8 +272,8 @@ export const APKInstallModal: React.FC<APKInstallModalProps> = ({ isOpen, onClos
                     {isDownloading
                       ? downloadStatus || 'Mengunduh APK Utuh...'
                       : downloadedSize
-                      ? 'Download Ulang APK (247 KB)'
-                      : 'Download APK Sekarang (247 KB Utuh)'}
+                      ? 'Download Ulang APK (17.1 MB)'
+                      : 'Download APK Sekarang (17.1 MB Utuh)'}
                   </span>
                 </button>
 
@@ -355,9 +355,22 @@ export const APKInstallModal: React.FC<APKInstallModalProps> = ({ isOpen, onClos
                     </div>
                     <div className="font-semibold text-neutral-200">Ketuk "Tetap Instal"</div>
                     <p className="text-neutral-400 text-[10px] leading-relaxed">
-                      Pilih <strong>"Izinkan dari sumber ini"</strong> dan <strong>"Tetap Instal"</strong>. Selesai!
+                      Pilih <strong>"Izinkan dari sumber ini"</strong> lalu ketuk <strong>"Tetap Instal (Install anyway)"</strong>. Selesai!
                     </p>
                   </div>
+                </div>
+
+                {/* Android 14 Privacy & Upgrade Note */}
+                <div className="mt-3 p-3 rounded-lg bg-neutral-900/90 border border-neutral-700/60 space-y-1.5 text-[11px]">
+                  <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Perbaikan Android 14 & Perlindungan Privasi Terbaru:</span>
+                  </div>
+                  <ul className="text-neutral-400 text-[10px] space-y-1 list-disc list-inside">
+                    <li>Target SDK telah dinaikkan ke <strong>Android 14 (API 34)</strong> dengan hak akses Scoped MediaStore terbaru.</li>
+                    <li>Jika sebelumnya Anda pernah mencoba menginstal versi lama, <strong>hapus/copot (uninstall) versi lama terlebih dahulu</strong> dari HP.</li>
+                    <li>Jika muncul dialog Google Play Protect, ketuk <strong>"Rincian Selengkapnya (More details)"</strong> lalu pilih <strong>"Tetap Instal (Install anyway)"</strong>.</li>
+                  </ul>
                 </div>
               </div>
             </div>

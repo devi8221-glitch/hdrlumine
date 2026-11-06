@@ -225,6 +225,39 @@ def main():
             if not info.filename.startswith("META-INF/"):
                 z.extract(info, extracted_apk)
 
+    # Patch binary AndroidManifest.xml for modern Android 14+ (API 34) privacy protection
+    manifest_path = os.path.join(extracted_apk, "AndroidManifest.xml")
+    if os.path.exists(manifest_path):
+        with open(manifest_path, "rb") as fp:
+            m_data = bytearray(fp.read())
+
+        # Update platformBuildVersionCode from 23 to 34, minSdkVersion from 21 to 26, targetSdkVersion to 34
+        for i in range(0, len(m_data) - 20, 4):
+            name, val_str, a_type, val_int = struct.unpack('<IIII', m_data[i+4:i+20])
+            if name == 18:  # platformBuildVersionCode
+                struct.pack_into('<i', m_data, i+16, 34)
+            if name == 2 and a_type == 0x10000008:  # minSdkVersion
+                struct.pack_into('<i', m_data, i+16, 26)
+            if name == 3 and a_type == 0x10000008:  # targetSdkVersion
+                struct.pack_into('<i', m_data, i+16, 34)
+
+        # Replace UTF-16 build version strings (same length)
+        old_s23 = '23'.encode('utf-16le')
+        new_s23 = '34'.encode('utf-16le')
+        pos23 = m_data.find(old_s23)
+        if pos23 != -1:
+            m_data[pos23:pos23+len(old_s23)] = new_s23
+
+        old_s24 = '6.0.1'.encode('utf-16le')
+        new_s24 = '14.00'.encode('utf-16le')
+        pos24 = m_data.find(old_s24)
+        if pos24 != -1:
+            m_data[pos24:pos24+len(old_s24)] = new_s24
+
+        with open(manifest_path, "wb") as fp:
+            fp.write(m_data)
+        print("  ✓ AndroidManifest.xml dimutakhirkan ke Android 14 (Target SDK 34, Min SDK 26, Build 34)")
+
     # 1. Update assets/www with latest production dist
     print("[3/6] Menyuntikkan dist web assets (clarity + high-bitrate exporter)...")
     www_dir = os.path.join(extracted_apk, "assets", "www")
