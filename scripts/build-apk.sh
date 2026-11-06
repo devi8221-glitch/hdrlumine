@@ -58,7 +58,7 @@ mkdir -p "$BUILD_DIR/res/values" \
 
 # 4. Copy canonical Android manifest & Java source
 cp "$ROOT_DIR/android/AndroidManifest.xml" "$BUILD_DIR/AndroidManifest.xml"
-cp "$ROOT_DIR/android/src/com/luminahdr/mastering/MainActivity.java" "$BUILD_DIR/src/com/luminahdr/mastering/MainActivity.java"
+cp "$ROOT_DIR/android/src/com/luminahdr/mastering/"*.java "$BUILD_DIR/src/com/luminahdr/mastering/"
 
 # Copy icons
 cp "$ROOT_DIR/public/pwa-192x192.png" "$BUILD_DIR/res/mipmap-mdpi-v4/ic_launcher.png"
@@ -88,7 +88,7 @@ rm -rf "$BUILD_DIR/gen"/* "$BUILD_DIR/bin"/*
 aapt package -f -m -J "$BUILD_DIR/gen" -M "$BUILD_DIR/AndroidManifest.xml" -S "$BUILD_DIR/res" -I "$ANDROID_JAR"
 
 # 6. Compile Java
-javac -source 1.8 -target 1.8 -d "$BUILD_DIR/bin" -classpath "$ANDROID_JAR":"$BUILD_DIR/gen" "$BUILD_DIR/src/com/luminahdr/mastering/MainActivity.java" "$BUILD_DIR/gen/com/luminahdr/mastering/R.java"
+javac -source 1.8 -target 1.8 -d "$BUILD_DIR/bin" -classpath "$ANDROID_JAR":"$BUILD_DIR/gen" "$BUILD_DIR/src/com/luminahdr/mastering/"*.java "$BUILD_DIR/gen/com/luminahdr/mastering/R.java"
 
 # 7. Dexing (Support d8, dalvik-exchange, and dx)
 if command -v d8 >/dev/null 2>&1; then
